@@ -6,25 +6,27 @@ import org.example.util.ConexionBD;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Scanner;
 
 public class Main {
-    private static ClienteDAO clienteDAO;
-    private static VehiculoDAO vehiculoDAO;
-    private static ServicioDAO servicioDAO;
-    private static RegistroLavadoDAO registroLavadoDAO;
-
     public static void main(String[] args) {
+
         try (Connection connection = ConexionBD.obtenerConexion()) {
-            // Inicializar DAOs
-            clienteDAO = new ClienteDAOImpl(connection);
-            vehiculoDAO = new VehiculoDAOImpl(connection);
-            servicioDAO = new ServicioDAOImpl(connection);
-            registroLavadoDAO = new RegistroLavadoDAOImpl(connection);
+            if (connection == null) {
+                System.out.println("No se pudo obtener conexión. Revisa ConexionBD.");
+                return;
+            }
+
+            ClienteDAO clienteDAO = new ClienteDAOImpl(connection);
+            VehiculoDAO vehiculoDAO = new VehiculoDAOImpl(connection);
+            ServicioDAO servicioDAO = new ServicioDAOImpl(connection);
+            RegistroLavadoDAO registroDAO = new RegistroLavadoDAOImpl(connection);
 
             Scanner scanner = new Scanner(System.in);
-            int opcionPrincipal;
+            int opcion;
 
             do {
                 System.out.println("\n=== MENÚ PRINCIPAL ===");
@@ -33,635 +35,298 @@ public class Main {
                 System.out.println("3. Gestionar Servicios");
                 System.out.println("4. Gestionar Registros de Lavado");
                 System.out.println("0. Salir");
-                System.out.print("Selecciona una opción: ");
-                opcionPrincipal = scanner.nextInt();
-                scanner.nextLine(); // limpiar buffer
+                System.out.print("Elige una opción: ");
+                opcion = Integer.parseInt(scanner.nextLine());
 
-                switch (opcionPrincipal) {
-                    case 1:
-                        menuClientes(scanner);
-                        break;
-                    case 2:
-                        menuVehiculos(scanner);
-                        break;
-                    case 3:
-                        menuServicios(scanner);
-                        break;
-                    case 4:
-                        menuRegistrosLavado(scanner);
-                        break;
-                    case 0:
-                        System.out.println("Saliendo del sistema...");
-                        break;
-                    default:
-                        System.out.println("Opción no válida, intenta de nuevo.");
+                switch (opcion) {
+                    case 1 -> menuClientes(scanner, clienteDAO);
+                    case 2 -> menuVehiculos(scanner, vehiculoDAO, clienteDAO);
+                    case 3 -> menuServicios(scanner, servicioDAO);
+                    case 4 -> menuRegistros(scanner, registroDAO, vehiculoDAO, servicioDAO);
+                    case 0 -> System.out.println("Saliendo...");
+                    default -> System.out.println("Opción no válida.");
                 }
-            } while (opcionPrincipal != 0);
+            } while (opcion != 0);
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    // -------------------------------
-    // SUBMENÚ CLIENTES
-    // -------------------------------
-    private static void menuClientes(Scanner scanner) {
-        int opcion;
+    // ---------- CLIENTES ----------
+    private static void menuClientes(Scanner scanner, ClienteDAO dao) {
+        int op;
         do {
-            System.out.println("\n--- GESTIÓN DE CLIENTES ---");
+            System.out.println("\n--- GESTIÓN CLIENTES ---");
             System.out.println("1. Registrar Cliente");
             System.out.println("2. Consultar Cliente");
             System.out.println("3. Actualizar Cliente");
             System.out.println("4. Eliminar Cliente");
-            System.out.println("5. Listar Clientes");
-            System.out.println("0. Volver al menú principal");
-            System.out.print("Selecciona una opción: ");
-            opcion = scanner.nextInt();
-            scanner.nextLine();
+            System.out.println("5. Listar Clientes (ver IDs)");
+            System.out.println("0. Volver");
+            System.out.print("Opción: ");
+            op = Integer.parseInt(scanner.nextLine());
 
-            switch (opcion) {
-                case 1:
-                    registrarCliente(scanner);
-                    break;
-                case 2:
-                    consultarCliente(scanner);
-                    break;
-                case 3:
-                    actualizarCliente(scanner);
-                    break;
-                case 4:
-                    eliminarCliente(scanner);
-                    break;
-                case 5:
-                    listarClientes();
-                    break;
-                case 0:
-                    System.out.println("Volviendo al menú principal...");
-                    break;
-                default:
-                    System.out.println("Opción no válida.");
+            switch (op) {
+                case 1 -> {
+                    System.out.print("Si quieres que la BD genere el ID deja vacío y presiona Enter. Si quieres especificar ID escribe el número: ");
+                    String idStr = scanner.nextLine().trim();
+                    int id = 0;
+                    if (!idStr.isEmpty()) id = Integer.parseInt(idStr);
+
+                    System.out.print("Nombre: "); String nombre = scanner.nextLine();
+                    System.out.print("Apellido: "); String apellido = scanner.nextLine();
+                    System.out.print("Teléfono: "); String tel = scanner.nextLine();
+                    System.out.print("Email: "); String email = scanner.nextLine();
+                    System.out.print("Dirección: "); String dir = scanner.nextLine();
+
+                    Cliente c = new Cliente(id, nombre, apellido, tel, email, dir);
+                    dao.crear(c);
+                    System.out.println("Cliente registrado. ID asignado: " + c.getClienteID());
+                }
+                case 2 -> {
+                    System.out.println("Lista de clientes (IDs):");
+                    dao.listar().forEach(cl -> System.out.println("ID=" + cl.getClienteID() + " -> " + cl.getNombre() + " " + cl.getApellido()));
+                    System.out.print("Ingrese ID del cliente a consultar: ");
+                    int idc = Integer.parseInt(scanner.nextLine());
+                    Cliente c = dao.leer(idc);
+                    System.out.println(c != null ? c : "Cliente no encontrado.");
+                }
+                case 3 -> {
+                    System.out.print("Ingrese ID del cliente a actualizar (usa listar para ver IDs): ");
+                    int idu = Integer.parseInt(scanner.nextLine());
+                    Cliente c = dao.leer(idu);
+                    if (c != null) {
+                        System.out.print("Nuevo nombre (" + c.getNombre() + "): "); String n = scanner.nextLine(); if (!n.isEmpty()) c.setNombre(n);
+                        System.out.print("Nuevo apellido (" + c.getApellido() + "): "); String a = scanner.nextLine(); if (!a.isEmpty()) c.setApellido(a);
+                        System.out.print("Nuevo teléfono (" + c.getTelefono() + "): "); String t = scanner.nextLine(); if (!t.isEmpty()) c.setTelefono(t);
+                        System.out.print("Nuevo email (" + c.getEmail() + "): "); String e = scanner.nextLine(); if (!e.isEmpty()) c.setEmail(e);
+                        System.out.print("Nueva dirección (" + c.getDireccion() + "): "); String d = scanner.nextLine(); if (!d.isEmpty()) c.setDireccion(d);
+                        dao.actualizar(c);
+                        System.out.println("Cliente actualizado.");
+                    } else System.out.println("Cliente no encontrado.");
+                }
+                case 4 -> {
+                    System.out.print("Ingrese ID del cliente a eliminar: ");
+                    int idd = Integer.parseInt(scanner.nextLine());
+                    dao.eliminar(idd);
+                    System.out.println("Cliente eliminado.");
+                }
+                case 5 -> {
+                    List<Cliente> lista = dao.listar();
+                    if (lista.isEmpty()) System.out.println("No hay clientes.");
+                    else lista.forEach(System.out::println);
+                }
             }
-        } while (opcion != 0);
+        } while (op != 0);
     }
 
-    private static void registrarCliente(Scanner scanner) {
-        System.out.print("ID del cliente: ");
-        int id = scanner.nextInt();
-        scanner.nextLine(); // Limpiar buffer
-
-        System.out.print("Nombre: ");
-        String nombre = scanner.nextLine();
-
-        System.out.print("Apellido: ");
-        String apellido = scanner.nextLine();
-
-        System.out.print("Teléfono: ");
-        String telefono = scanner.nextLine();
-
-        System.out.print("Email: ");
-        String email = scanner.nextLine();
-
-        System.out.print("Dirección: ");
-        String direccion = scanner.nextLine();
-
-        Cliente cliente = new Cliente(id, nombre, apellido, telefono, email, direccion);
-        clienteDAO.crear(cliente);
-        System.out.println("Cliente registrado exitosamente.");
-    }
-
-    private static void consultarCliente(Scanner scanner) {
-        System.out.print("ID del cliente a consultar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Cliente cliente = clienteDAO.leer(id);
-        if (cliente != null) {
-            System.out.println("Cliente encontrado:");
-            System.out.println(cliente.toStringLegible());
-        } else {
-            System.out.println("Cliente no encontrado.");
-        }
-    }
-
-    private static void actualizarCliente(Scanner scanner) {
-        System.out.print("ID del cliente a actualizar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Cliente cliente = clienteDAO.leer(id);
-        if (cliente == null) {
-            System.out.println("Cliente no encontrado.");
-            return;
-        }
-
-        System.out.println("Cliente actual: " + cliente.toStringLegible());
-        System.out.println("Ingrese los nuevos datos (dejar en blanco para mantener actual):");
-
-        System.out.print("Nombre [" + cliente.getNombre() + "]: ");
-        String nombre = scanner.nextLine();
-        if (!nombre.isEmpty()) cliente.setNombre(nombre);
-
-        System.out.print("Apellido [" + cliente.getApellido() + "]: ");
-        String apellido = scanner.nextLine();
-        if (!apellido.isEmpty()) cliente.setApellido(apellido);
-
-        System.out.print("Teléfono [" + cliente.getTelefono() + "]: ");
-        String telefono = scanner.nextLine();
-        if (!telefono.isEmpty()) cliente.setTelefono(telefono);
-
-        System.out.print("Email [" + cliente.getEmail() + "]: ");
-        String email = scanner.nextLine();
-        if (!email.isEmpty()) cliente.setEmail(email);
-
-        System.out.print("Dirección [" + cliente.getDireccion() + "]: ");
-        String direccion = scanner.nextLine();
-        if (!direccion.isEmpty()) cliente.setDireccion(direccion);
-
-        clienteDAO.actualizar(cliente);
-        System.out.println("Cliente actualizado exitosamente.");
-    }
-
-    private static void eliminarCliente(Scanner scanner) {
-        System.out.print("ID del cliente a eliminar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Cliente cliente = clienteDAO.leer(id);
-        if (cliente != null) {
-            System.out.println("¿Está seguro de eliminar al cliente: " + cliente.getNombre() + " " + cliente.getApellido() + "? (s/n)");
-            String confirmacion = scanner.nextLine();
-            if (confirmacion.equalsIgnoreCase("s")) {
-                clienteDAO.eliminar(id);
-                System.out.println("Cliente eliminado exitosamente.");
-            } else {
-                System.out.println("Eliminación cancelada.");
-            }
-        } else {
-            System.out.println("Cliente no encontrado.");
-        }
-    }
-
-    private static void listarClientes() {
-        List<Cliente> clientes = clienteDAO.listar();
-        if (clientes.isEmpty()) {
-            System.out.println("No hay clientes registrados.");
-        } else {
-            System.out.println("=== LISTA DE CLIENTES ===");
-            for (Cliente cliente : clientes) {
-                System.out.println(cliente.toStringLegible());
-            }
-        }
-    }
-
-    // -------------------------------
-    // SUBMENÚ VEHÍCULOS
-    // -------------------------------
-    private static void menuVehiculos(Scanner scanner) {
-        int opcion;
+    // ---------- VEHÍCULOS ----------
+    private static void menuVehiculos(Scanner scanner, VehiculoDAO dao, ClienteDAO clienteDAO) {
+        int op;
         do {
-            System.out.println("\n--- GESTIÓN DE VEHÍCULOS ---");
+            System.out.println("\n--- GESTIÓN VEHÍCULOS ---");
             System.out.println("1. Registrar Vehículo");
             System.out.println("2. Consultar Vehículo");
             System.out.println("3. Actualizar Vehículo");
             System.out.println("4. Eliminar Vehículo");
-            System.out.println("5. Listar Vehículos");
-            System.out.println("0. Volver al menú principal");
-            System.out.print("Selecciona una opción: ");
-            opcion = scanner.nextInt();
-            scanner.nextLine();
+            System.out.println("5. Listar Vehículos (ver IDs)");
+            System.out.println("0. Volver");
+            System.out.print("Opción: ");
+            op = Integer.parseInt(scanner.nextLine());
 
-            switch (opcion) {
-                case 1:
-                    registrarVehiculo(scanner);
-                    break;
-                case 2:
-                    consultarVehiculo(scanner);
-                    break;
-                case 3:
-                    actualizarVehiculo(scanner);
-                    break;
-                case 4:
-                    eliminarVehiculo(scanner);
-                    break;
-                case 5:
-                    listarVehiculos();
-                    break;
-                case 0:
-                    System.out.println("Volviendo al menú principal...");
-                    break;
-                default:
-                    System.out.println("Opción no válida.");
+            switch (op) {
+                case 1 -> {
+                    System.out.print("Si quieres que la BD genere el ID deja vacío y presiona Enter. Si quieres especificar ID escribe el número: ");
+                    String idStr = scanner.nextLine().trim();
+                    int id = 0;
+                    if (!idStr.isEmpty()) id = Integer.parseInt(idStr);
+
+                    System.out.print("ID del cliente propietario (puedes listar clientes primero): ");
+                    int clienteId = Integer.parseInt(scanner.nextLine());
+
+                    System.out.print("Marca: "); String marca = scanner.nextLine();
+                    System.out.print("Modelo: "); String modelo = scanner.nextLine();
+                    System.out.print("Placa: "); String placa = scanner.nextLine();
+                    System.out.print("Color: "); String color = scanner.nextLine();
+                    System.out.print("Tipo: "); String tipo = scanner.nextLine();
+
+                    Vehiculo v = new Vehiculo(id, clienteId, marca, modelo, placa, color, tipo);
+                    dao.crear(v);
+                    System.out.println("Vehículo registrado. ID: " + v.getVehiculoID());
+                }
+                case 2 -> {
+                    System.out.println("Vehículos (IDs):");
+                    dao.listar().forEach(veh -> System.out.println("ID=" + veh.getVehiculoID() + " -> " + veh.getPlaca() + " / " + veh.getMarca()));
+                    System.out.print("Ingrese ID del vehículo a consultar: ");
+                    int idv = Integer.parseInt(scanner.nextLine());
+                    Vehiculo v = dao.leer(idv);
+                    System.out.println(v != null ? v : "Vehículo no encontrado.");
+                }
+                case 3 -> {
+                    System.out.print("Ingrese ID del vehículo a actualizar: ");
+                    int idu = Integer.parseInt(scanner.nextLine());
+                    Vehiculo v = dao.leer(idu);
+                    if (v != null) {
+                        System.out.print("Nueva marca (" + v.getMarca() + "): "); String m = scanner.nextLine(); if (!m.isEmpty()) v.setMarca(m);
+                        System.out.print("Nuevo modelo (" + v.getModelo() + "): "); String mo = scanner.nextLine(); if (!mo.isEmpty()) v.setModelo(mo);
+                        System.out.print("Nueva placa (" + v.getPlaca() + "): "); String p = scanner.nextLine(); if (!p.isEmpty()) v.setPlaca(p);
+                        System.out.print("Nuevo color (" + v.getColor() + "): "); String c = scanner.nextLine(); if (!c.isEmpty()) v.setColor(c);
+                        System.out.print("Nuevo tipo (" + v.getTipo() + "): "); String t = scanner.nextLine(); if (!t.isEmpty()) v.setTipo(t);
+                        dao.actualizar(v);
+                        System.out.println("Vehículo actualizado.");
+                    } else System.out.println("Vehículo no encontrado.");
+                }
+                case 4 -> {
+                    System.out.print("Ingrese ID del vehículo a eliminar: ");
+                    int idd = Integer.parseInt(scanner.nextLine());
+                    dao.eliminar(idd);
+                    System.out.println("Vehículo eliminado.");
+                }
+                case 5 -> {
+                    List<Vehiculo> lista = dao.listar();
+                    if (lista.isEmpty()) System.out.println("No hay vehículos.");
+                    else lista.forEach(System.out::println);
+                }
             }
-        } while (opcion != 0);
+        } while (op != 0);
     }
 
-    private static void registrarVehiculo(Scanner scanner) {
-        System.out.print("ID del vehículo: ");
-        int vehiculoId = scanner.nextInt();
-        scanner.nextLine();
-
-        System.out.print("ID del cliente dueño: ");
-        int clienteId = scanner.nextInt();
-        scanner.nextLine();
-
-        System.out.print("Marca: ");
-        String marca = scanner.nextLine();
-
-        System.out.print("Modelo: ");
-        String modelo = scanner.nextLine();
-
-        System.out.print("Placa: ");
-        String placa = scanner.nextLine();
-
-        System.out.print("Color: ");
-        String color = scanner.nextLine();
-
-        System.out.print("Tipo: ");
-        String tipo = scanner.nextLine();
-
-        Vehiculo vehiculo = new Vehiculo(vehiculoId, clienteId, marca, modelo, placa, color, tipo);
-        vehiculoDAO.crear(vehiculo);
-        System.out.println("Vehículo registrado exitosamente.");
-    }
-
-    private static void consultarVehiculo(Scanner scanner) {
-        System.out.print("ID del vehículo a consultar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Vehiculo vehiculo = vehiculoDAO.leer(id);
-        if (vehiculo != null) {
-            System.out.println("Vehículo encontrado:");
-            System.out.println(vehiculo.toString());
-        } else {
-            System.out.println("Vehículo no encontrado.");
-        }
-    }
-
-    private static void actualizarVehiculo(Scanner scanner) {
-        System.out.print("ID del vehículo a actualizar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Vehiculo vehiculo = vehiculoDAO.leer(id);
-        if (vehiculo == null) {
-            System.out.println("Vehículo no encontrado.");
-            return;
-        }
-
-        System.out.println("Vehículo actual: " + vehiculo.toString());
-        System.out.println("Ingrese los nuevos datos (dejar en blanco para mantener actual):");
-
-        System.out.print("Marca [" + vehiculo.getMarca() + "]: ");
-        String marca = scanner.nextLine();
-        if (!marca.isEmpty()) vehiculo.setMarca(marca);
-
-        System.out.print("Modelo [" + vehiculo.getModelo() + "]: ");
-        String modelo = scanner.nextLine();
-        if (!modelo.isEmpty()) vehiculo.setModelo(modelo);
-
-        System.out.print("Placa [" + vehiculo.getPlaca() + "]: ");
-        String placa = scanner.nextLine();
-        if (!placa.isEmpty()) vehiculo.setPlaca(placa);
-
-        System.out.print("Color [" + vehiculo.getColor() + "]: ");
-        String color = scanner.nextLine();
-        if (!color.isEmpty()) vehiculo.setColor(color);
-
-        System.out.print("Tipo [" + vehiculo.getTipo() + "]: ");
-        String tipo = scanner.nextLine();
-        if (!tipo.isEmpty()) vehiculo.setTipo(tipo);
-
-        vehiculoDAO.actualizar(vehiculo);
-        System.out.println("Vehículo actualizado exitosamente.");
-    }
-
-    private static void eliminarVehiculo(Scanner scanner) {
-        System.out.print("ID del vehículo a eliminar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Vehiculo vehiculo = vehiculoDAO.leer(id);
-        if (vehiculo != null) {
-            System.out.println("¿Está seguro de eliminar el vehículo: " + vehiculo.getMarca() + " " + vehiculo.getModelo() + "? (s/n)");
-            String confirmacion = scanner.nextLine();
-            if (confirmacion.equalsIgnoreCase("s")) {
-                vehiculoDAO.eliminar(id);
-                System.out.println("Vehículo eliminado exitosamente.");
-            } else {
-                System.out.println("Eliminación cancelada.");
-            }
-        } else {
-            System.out.println("Vehículo no encontrado.");
-        }
-    }
-
-    private static void listarVehiculos() {
-        List<Vehiculo> vehiculos = vehiculoDAO.listar();
-        if (vehiculos.isEmpty()) {
-            System.out.println("No hay vehículos registrados.");
-        } else {
-            System.out.println("=== LISTA DE VEHÍCULOS ===");
-            for (Vehiculo vehiculo : vehiculos) {
-                System.out.println(vehiculo.toString());
-            }
-        }
-    }
-
-    // -------------------------------
-    // SUBMENÚ SERVICIOS
-    // -------------------------------
-    private static void menuServicios(Scanner scanner) {
-        int opcion;
+    // ---------- SERVICIOS ----------
+    private static void menuServicios(Scanner scanner, ServicioDAO dao) {
+        int op;
         do {
-            System.out.println("\n--- GESTIÓN DE SERVICIOS ---");
+            System.out.println("\n--- GESTIÓN SERVICIOS ---");
             System.out.println("1. Registrar Servicio");
             System.out.println("2. Consultar Servicio");
             System.out.println("3. Actualizar Servicio");
             System.out.println("4. Eliminar Servicio");
-            System.out.println("5. Listar Servicios");
-            System.out.println("0. Volver al menú principal");
-            System.out.print("Selecciona una opción: ");
-            opcion = scanner.nextInt();
-            scanner.nextLine();
+            System.out.println("5. Listar Servicios (ver IDs)");
+            System.out.println("0. Volver");
+            System.out.print("Opción: ");
+            op = Integer.parseInt(scanner.nextLine());
 
-            switch (opcion) {
-                case 1:
-                    registrarServicio(scanner);
-                    break;
-                case 2:
-                    consultarServicio(scanner);
-                    break;
-                case 3:
-                    actualizarServicio(scanner);
-                    break;
-                case 4:
-                    eliminarServicio(scanner);
-                    break;
-                case 5:
-                    listarServicios();
-                    break;
-                case 0:
-                    System.out.println("Volviendo al menú principal...");
-                    break;
-                default:
-                    System.out.println("Opción no válida.");
+            switch (op) {
+                case 1 -> {
+                    System.out.print("Si quieres que la BD genere el ID deja vacío. Si quieres especificar ID escribe el número: ");
+                    String idStr = scanner.nextLine().trim();
+                    int id = 0;
+                    if (!idStr.isEmpty()) id = Integer.parseInt(idStr);
+
+                    System.out.print("Nombre: "); String nombre = scanner.nextLine();
+                    System.out.print("Precio: "); double precio = Double.parseDouble(scanner.nextLine());
+
+                    Servicio s = new Servicio(id, nombre, precio);
+                    dao.crear(s);
+                    System.out.println("Servicio registrado. ID: " + s.getServicioID());
+                }
+                case 2 -> {
+                    System.out.println("Servicios (IDs):");
+                    dao.listar().forEach(serv -> System.out.println("ID=" + serv.getServicioID() + " -> " + serv.getNombre() + " $" + serv.getPrecio()));
+                    System.out.print("Ingrese ID del servicio a consultar: ");
+                    int ids = Integer.parseInt(scanner.nextLine());
+                    Servicio s = dao.leer(ids);
+                    System.out.println(s != null ? s : "Servicio no encontrado.");
+                }
+                case 3 -> {
+                    System.out.print("Ingrese ID del servicio a actualizar: ");
+                    int idu = Integer.parseInt(scanner.nextLine());
+                    Servicio s = dao.leer(idu);
+                    if (s != null) {
+                        System.out.print("Nuevo nombre (" + s.getNombre() + "): "); String n = scanner.nextLine(); if (!n.isEmpty()) s.setNombre(n);
+                        System.out.print("Nuevo precio (" + s.getPrecio() + "): "); String p = scanner.nextLine(); if (!p.isEmpty()) s.setPrecio(Double.parseDouble(p));
+                        dao.actualizar(s);
+                        System.out.println("Servicio actualizado.");
+                    } else System.out.println("Servicio no encontrado.");
+                }
+                case 4 -> {
+                    System.out.print("Ingrese ID del servicio a eliminar: ");
+                    int idd = Integer.parseInt(scanner.nextLine());
+                    dao.eliminar(idd);
+                    System.out.println("Servicio eliminado.");
+                }
+                case 5 -> {
+                    List<Servicio> lista = dao.listar();
+                    if (lista.isEmpty()) System.out.println("No hay servicios.");
+                    else lista.forEach(System.out::println);
+                }
             }
-        } while (opcion != 0);
+        } while (op != 0);
     }
 
-    private static void registrarServicio(Scanner scanner) {
-        System.out.print("ID del servicio: ");
-        int servicioId = scanner.nextInt();
-        scanner.nextLine();
-
-        System.out.print("Nombre del servicio: ");
-        String nombre = scanner.nextLine();
-
-        System.out.print("Precio: ");
-        double precio = scanner.nextDouble();
-        scanner.nextLine();
-
-        Servicio servicio = new Servicio(servicioId, nombre, precio);
-        servicioDAO.crear(servicio);
-        System.out.println("Servicio registrado exitosamente.");
-    }
-
-    private static void consultarServicio(Scanner scanner) {
-        System.out.print("ID del servicio a consultar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Servicio servicio = servicioDAO.leer(id);
-        if (servicio != null) {
-            System.out.println("Servicio encontrado:");
-            System.out.println(servicio.toString());
-        } else {
-            System.out.println("Servicio no encontrado.");
-        }
-    }
-
-    private static void actualizarServicio(Scanner scanner) {
-        System.out.print("ID del servicio a actualizar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Servicio servicio = servicioDAO.leer(id);
-        if (servicio == null) {
-            System.out.println("Servicio no encontrado.");
-            return;
-        }
-
-        System.out.println("Servicio actual: " + servicio.toString());
-        System.out.println("Ingrese los nuevos datos (dejar en blanco para mantener actual):");
-
-        System.out.print("Nombre [" + servicio.getNombre() + "]: ");
-        String nombre = scanner.nextLine();
-        if (!nombre.isEmpty()) servicio.setNombre(nombre);
-
-        System.out.print("Precio [" + servicio.getPrecio() + "]: ");
-        String precioStr = scanner.nextLine();
-        if (!precioStr.isEmpty()) {
-            try {
-                servicio.setPrecio(Double.parseDouble(precioStr));
-            } catch (NumberFormatException e) {
-                System.out.println("Precio inválido, se mantiene el actual.");
-            }
-        }
-
-        servicioDAO.actualizar(servicio);
-        System.out.println("Servicio actualizado exitosamente.");
-    }
-
-    private static void eliminarServicio(Scanner scanner) {
-        System.out.print("ID del servicio a eliminar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        Servicio servicio = servicioDAO.leer(id);
-        if (servicio != null) {
-            System.out.println("¿Está seguro de eliminar el servicio: " + servicio.getNombre() + "? (s/n)");
-            String confirmacion = scanner.nextLine();
-            if (confirmacion.equalsIgnoreCase("s")) {
-                servicioDAO.eliminar(id);
-                System.out.println("Servicio eliminado exitosamente.");
-            } else {
-                System.out.println("Eliminación cancelada.");
-            }
-        } else {
-            System.out.println("Servicio no encontrado.");
-        }
-    }
-
-    private static void listarServicios() {
-        List<Servicio> servicios = servicioDAO.listar();
-        if (servicios.isEmpty()) {
-            System.out.println("No hay servicios registrados.");
-        } else {
-            System.out.println("=== LISTA DE SERVICIOS ===");
-            for (Servicio servicio : servicios) {
-                System.out.println(servicio.toString());
-            }
-        }
-    }
-
-    // -------------------------------
-    // SUBMENÚ REGISTROS DE LAVADO
-    // -------------------------------
-    private static void menuRegistrosLavado(Scanner scanner) {
-        int opcion;
+    // ---------- REGISTROS DE LAVADO ----------
+    private static void menuRegistros(Scanner scanner, RegistroLavadoDAO dao, VehiculoDAO vehDAO, ServicioDAO servDAO) {
+        int op;
         do {
-            System.out.println("\n--- GESTIÓN DE REGISTROS DE LAVADO ---");
+            System.out.println("\n--- GESTIÓN REGISTROS DE LAVADO ---");
             System.out.println("1. Registrar Lavado");
-            System.out.println("2. Consultar Lavado");
-            System.out.println("3. Actualizar Lavado");
-            System.out.println("4. Eliminar Lavado");
-            System.out.println("5. Listar Lavados");
-            System.out.println("0. Volver al menú principal");
-            System.out.print("Selecciona una opción: ");
-            opcion = scanner.nextInt();
-            scanner.nextLine();
+            System.out.println("2. Consultar Registro");
+            System.out.println("3. Actualizar Registro");
+            System.out.println("4. Eliminar Registro");
+            System.out.println("5. Listar Registros (ver IDs)");
+            System.out.println("0. Volver");
+            System.out.print("Opción: ");
+            op = Integer.parseInt(scanner.nextLine());
 
-            switch (opcion) {
-                case 1:
-                    registrarLavado(scanner);
-                    break;
-                case 2:
-                    consultarLavado(scanner);
-                    break;
-                case 3:
-                    actualizarLavado(scanner);
-                    break;
-                case 4:
-                    eliminarLavado(scanner);
-                    break;
-                case 5:
-                    listarLavados();
-                    break;
-                case 0:
-                    System.out.println("Volviendo al menú principal...");
-                    break;
-                default:
-                    System.out.println("Opción no válida.");
+            switch (op) {
+                case 1 -> {
+                    System.out.print("Si quieres que la BD genere el ID deja vacío. Si quieres especificar ID escribe el número: ");
+                    String idStr = scanner.nextLine().trim();
+                    int id = 0;
+                    if (!idStr.isEmpty()) id = Integer.parseInt(idStr);
+
+                    System.out.println("Vehículos (IDs):");
+                    vehDAO.listar().forEach(v -> System.out.println("ID=" + v.getVehiculoID() + " -> " + v.getPlaca()));
+                    System.out.print("Ingrese ID del vehículo: "); int idVeh = Integer.parseInt(scanner.nextLine());
+
+                    System.out.println("Servicios (IDs):");
+                    servDAO.listar().forEach(s -> System.out.println("ID=" + s.getServicioID() + " -> " + s.getNombre()));
+                    System.out.print("Ingrese ID del servicio: "); int idServ = Integer.parseInt(scanner.nextLine());
+
+                    System.out.print("Fecha lavado (YYYY-MM-DD): "); LocalDate fecha = LocalDate.parse(scanner.nextLine());
+                    System.out.print("Hora inicio (HH:MM): "); LocalTime inicio = LocalTime.parse(scanner.nextLine());
+                    System.out.print("Hora fin (HH:MM): "); LocalTime fin = LocalTime.parse(scanner.nextLine());
+                    System.out.print("Precio total: "); double precio = Double.parseDouble(scanner.nextLine());
+
+                    RegistroLavado r = new RegistroLavado(id, idVeh, idServ, fecha, inicio, fin, precio);
+                    dao.crear(r);
+                    System.out.println("Registro creado. ID: " + r.getRegistroID());
+                }
+                case 2 -> {
+                    System.out.println("Registros (IDs):");
+                    dao.listar().forEach(reg -> System.out.println("ID=" + reg.getRegistroID() + " -> VehiculoID=" + reg.getVehiculoID()));
+                    System.out.print("Ingrese ID del registro a consultar: ");
+                    int idq = Integer.parseInt(scanner.nextLine());
+                    RegistroLavado r = dao.leer(idq);
+                    System.out.println(r != null ? r : "Registro no encontrado.");
+                }
+                case 3 -> {
+                    System.out.print("Ingrese ID del registro a actualizar: ");
+                    int idu = Integer.parseInt(scanner.nextLine());
+                    RegistroLavado r = dao.leer(idu);
+                    if (r != null) {
+                        System.out.print("Nuevo vehiculoID (" + r.getVehiculoID() + "): "); String nv = scanner.nextLine(); if (!nv.isEmpty()) r.setVehiculoID(Integer.parseInt(nv));
+                        System.out.print("Nuevo servicioID (" + r.getServicioID() + "): "); String ns = scanner.nextLine(); if (!ns.isEmpty()) r.setServicioID(Integer.parseInt(ns));
+                        System.out.print("Nueva fecha (" + r.getFechaLavado() + "): "); String nf = scanner.nextLine(); if (!nf.isEmpty()) r.setFechaLavado(LocalDate.parse(nf));
+                        System.out.print("Nueva hora inicio (" + r.getHoraInicio() + "): "); String ni = scanner.nextLine(); if (!ni.isEmpty()) r.setHoraInicio(LocalTime.parse(ni));
+                        System.out.print("Nueva hora fin (" + r.getHoraFin() + "): "); String nf2 = scanner.nextLine(); if (!nf2.isEmpty()) r.setHoraFin(LocalTime.parse(nf2));
+                        System.out.print("Nuevo precio (" + r.getPrecioTotal() + "): "); String np = scanner.nextLine(); if (!np.isEmpty()) r.setPrecioTotal(Double.parseDouble(np));
+                        dao.actualizar(r);
+                        System.out.println("Registro actualizado.");
+                    } else System.out.println("Registro no encontrado.");
+                }
+                case 4 -> {
+                    System.out.print("Ingrese ID del registro a eliminar: ");
+                    int idd = Integer.parseInt(scanner.nextLine());
+                    dao.eliminar(idd);
+                    System.out.println("Registro eliminado.");
+                }
+                case 5 -> {
+                    List<RegistroLavado> lista = dao.listar();
+                    if (lista.isEmpty()) System.out.println("No hay registros.");
+                    else lista.forEach(System.out::println);
+                }
             }
-        } while (opcion != 0);
-    }
-
-    private static void registrarLavado(Scanner scanner) {
-        System.out.print("ID del registro: ");
-        int registroId = scanner.nextInt();
-        scanner.nextLine();
-
-        System.out.print("ID del vehículo: ");
-        int vehiculoId = scanner.nextInt();
-        scanner.nextLine();
-
-        System.out.print("ID del servicio: ");
-        int servicioId = scanner.nextInt();
-        scanner.nextLine();
-
-        System.out.print("Fecha de lavado (YYYY-MM-DD): ");
-        String fecha = scanner.nextLine();
-
-        System.out.print("Hora de inicio (HH:MM:SS): ");
-        String horaInicio = scanner.nextLine();
-
-        System.out.print("Hora de fin (HH:MM:SS): ");
-        String horaFin = scanner.nextLine();
-
-        System.out.print("Precio total: ");
-        double precioTotal = scanner.nextDouble();
-        scanner.nextLine();
-
-        RegistroLavado registro = new RegistroLavado(registroId, vehiculoId, servicioId, fecha, horaInicio, horaFin, precioTotal);
-        registroLavadoDAO.crear(registro);
-        System.out.println("Registro de lavado creado exitosamente.");
-    }
-
-    private static void consultarLavado(Scanner scanner) {
-        System.out.print("ID del registro a consultar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        RegistroLavado registro = registroLavadoDAO.leer(id);
-        if (registro != null) {
-            System.out.println("Registro encontrado:");
-            System.out.println(registro.toString());
-        } else {
-            System.out.println("Registro no encontrado.");
-        }
-    }
-
-    private static void actualizarLavado(Scanner scanner) {
-        System.out.print("ID del registro a actualizar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        RegistroLavado registro = registroLavadoDAO.leer(id);
-        if (registro == null) {
-            System.out.println("Registro no encontrado.");
-            return;
-        }
-
-        System.out.println("Registro actual: " + registro.toString());
-        System.out.println("Ingrese los nuevos datos (dejar en blanco para mantener actual):");
-
-        System.out.print("Fecha [" + registro.getFechaLavado() + "]: ");
-        String fecha = scanner.nextLine();
-        if (!fecha.isEmpty()) registro.setFechaLavado(fecha);
-
-        System.out.print("Hora inicio [" + registro.getHoraInicio() + "]: ");
-        String horaInicio = scanner.nextLine();
-        if (!horaInicio.isEmpty()) registro.setHoraInicio(horaInicio);
-
-        System.out.print("Hora fin [" + registro.getHoraFin() + "]: ");
-        String horaFin = scanner.nextLine();
-        if (!horaFin.isEmpty()) registro.setHoraFin(horaFin);
-
-        System.out.print("Precio total [" + registro.getPrecioTotal() + "]: ");
-        String precioStr = scanner.nextLine();
-        if (!precioStr.isEmpty()) {
-            try {
-                registro.setPrecioTotal(Double.parseDouble(precioStr));
-            } catch (NumberFormatException e) {
-                System.out.println("Precio inválido, se mantiene el actual.");
-            }
-        }
-
-        registroLavadoDAO.actualizar(registro);
-        System.out.println("Registro actualizado exitosamente.");
-    }
-
-    private static void eliminarLavado(Scanner scanner) {
-        System.out.print("ID del registro a eliminar: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-
-        RegistroLavado registro = registroLavadoDAO.leer(id);
-        if (registro != null) {
-            System.out.println("¿Está seguro de eliminar el registro del " + registro.getFechaLavado() + "? (s/n)");
-            String confirmacion = scanner.nextLine();
-            if (confirmacion.equalsIgnoreCase("s")) {
-                registroLavadoDAO.eliminar(id);
-                System.out.println("Registro eliminado exitosamente.");
-            } else {
-                System.out.println("Eliminación cancelada.");
-            }
-        } else {
-            System.out.println("Registro no encontrado.");
-        }
-    }
-
-    private static void listarLavados() {
-        List<RegistroLavado> registros = registroLavadoDAO.listar();
-        if (registros.isEmpty()) {
-            System.out.println("No hay registros de lavado.");
-        } else {
-            System.out.println("=== LISTA DE REGISTROS DE LAVADO ===");
-            for (RegistroLavado registro : registros) {
-                System.out.println(registro.toString());
-            }
-        }
+        } while (op != 0);
     }
 }

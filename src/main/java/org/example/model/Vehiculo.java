@@ -1,7 +1,7 @@
 package org.example.model;
 
 public class Vehiculo {
-    private int id;
+    private int vehiculoID;
     private int clienteID;
     private String marca;
     private String modelo;
@@ -11,8 +11,8 @@ public class Vehiculo {
 
     public Vehiculo() {}
 
-    public Vehiculo(int id, int clienteID, String marca, String modelo, String placa, String color, String tipo) {
-        this.id = id;
+    public Vehiculo(int vehiculoID, int clienteID, String marca, String modelo, String placa, String color, String tipo) {
+        this.vehiculoID = vehiculoID;
         this.clienteID = clienteID;
         this.marca = marca;
         this.modelo = modelo;
@@ -21,8 +21,8 @@ public class Vehiculo {
         this.tipo = tipo;
     }
 
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
+    public int getVehiculoID() { return vehiculoID; }
+    public void setVehiculoID(int vehiculoID) { this.vehiculoID = vehiculoID; }
 
     public int getClienteID() { return clienteID; }
     public void setClienteID(int clienteID) { this.clienteID = clienteID; }
@@ -45,7 +45,7 @@ public class Vehiculo {
     @Override
     public String toString() {
         return "Vehiculo{" +
-                "id=" + id +
+                "vehiculoID=" + vehiculoID +
                 ", clienteID=" + clienteID +
                 ", marca='" + marca + '\'' +
                 ", modelo='" + modelo + '\'' +
